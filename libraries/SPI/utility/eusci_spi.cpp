@@ -215,6 +215,7 @@ uint8_t spi_send(const uint8_t data)
 {
 	/* Wait for previous tx to complete. */
 	while (!(UCzIFG & UCTXIFG));
+	UCzIFG &= ~UCRXIFG;   /* clear RXIFG flag */
 
 	/* Setting TXBUF clears the TXIFG flag. */
 	UCzTXBUF = data;
@@ -231,6 +232,7 @@ uint16_t spi_send16(const uint16_t data)
 	uint16_t datain;
 	/* Wait for previous tx to complete. */
 	while (!(UCzIFG & UCTXIFG));
+	UCzIFG &= ~UCRXIFG;   /* clear RXIFG flag */
 	/* Setting TXBUF clears the TXIFG flag. */
 	UCzTXBUF = data | 0xFF;
 	/* Wait for previous tx to complete. */
@@ -249,25 +251,26 @@ uint16_t spi_send16(const uint16_t data)
 
 void spi_send(void *buf, uint16_t count)
 {
-    uint8_t *ptx = (uint8_t *)buf;
-    uint8_t *prx = (uint8_t *)buf;
+	uint8_t *ptx = (uint8_t *)buf;
+	uint8_t *prx = (uint8_t *)buf;
 	if (count == 0) return;
 	/* Wait for previous tx to complete. */
 	while (!(UCzIFG & UCTXIFG));
+	/* clear RXIFG flag */
+	UCzIFG &= ~UCRXIFG;
 	while(count){
-		if (UCzIFG & UCRXIFG){
-			/* Reading RXBUF clears the RXIFG flag. */
-			*prx++ = UCzRXBUF;
-		}
-		if (UCzIFG & UCTXIFG){
+		while (!(UCzIFG & UCTXIFG));
+		{
 			/* Setting TXBUF clears the TXIFG flag. */
 			UCzTXBUF = *ptx++;
 			count--;
 		}
+		while (!(UCzIFG & UCRXIFG));
+		{
+			/* Reading RXBUF clears the RXIFG flag. */
+			*prx++ = UCzRXBUF;
+		}
 	}
-	/* Wait for last rx character? */
-	while (!(UCzIFG & UCRXIFG));
-	*prx++ = UCzRXBUF;
 }
 
 /**
@@ -306,7 +309,7 @@ void spi_transmit16(const uint16_t data)
 
 void spi_transmit(void *buf, uint16_t count)
 {
-    uint8_t *ptx = (uint8_t *)buf;
+	uint8_t *ptx = (uint8_t *)buf;
 	if (count == 0) return;
 	while(count){
 		if (UCzIFG & UCTXIFG){
